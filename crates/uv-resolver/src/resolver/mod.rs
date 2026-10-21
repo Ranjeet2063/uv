@@ -26,8 +26,8 @@ use uv_distribution::{ArchiveMetadata, DistributionDatabase, InstalledWheelVaria
 use uv_distribution_types::{
     BuiltDist, DerivationChain, Dist, DistErrorKind, Identifier, IndexCapabilities, IndexLocations,
     IndexMetadata, IndexUrl, InstalledDist, Name, RemoteSource, Requirement, RequiresPython,
-    ResolutionRecorder, ResolvedDist, SourceDist, SupportedVariantProperties, VariantsJsonContent,
-    VersionOrUrlRef,
+    ResolutionRecorder, ResolvedDist, SelectedVariant, SourceDist, SupportedVariantProperties,
+    VariantsJsonContent, VersionOrUrlRef,
 };
 use uv_git::GitResolver;
 use uv_normalize::PackageName;
@@ -75,7 +75,7 @@ use crate::resolver::environment::{
     ForkingPossibility, fork_version_by_marker, fork_version_by_python_requirement,
 };
 pub(crate) use crate::resolver::fork_map::{ForkMap, ForkSet};
-pub use crate::resolver::index::InMemoryIndex;
+pub use crate::resolver::index::{DirectWheelVariantIndex, InMemoryIndex};
 use crate::resolver::index::{ParsedVariantsJson, ParsedVariantsJsonResponse};
 use crate::resolver::indexes::Indexes;
 use crate::resolver::package_source::PackageSource;
@@ -1339,7 +1339,15 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
             }
         }
 
-        pins.insert_url(name, version, registered);
+        let variant = if env.marker_environment().is_some()
+            && let Dist::Built(built) = &dist
+            && built.wheel_filename().variant().is_some()
+        {
+            requests.select_direct_variant(built)?
+        } else {
+            None
+        };
+        pins.insert_url(name, version, registered, variant);
         Ok(Some(ResolverVersion::Unforked(version.clone())))
     }
 
@@ -2328,6 +2336,11 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
                         .variant_properties()
                         .done(parsed.artifact.clone(), Arc::new(properties));
                 }
+                Some(Response::DirectVariant { dist, variant }) => {
+                    self.index
+                        .direct_variants()
+                        .done(dist.distribution_id(), variant);
+                }
                 None => {}
             }
         }
@@ -2342,6 +2355,10 @@ impl<InstalledPackages: InstalledPackagesProvider> ResolverState<InstalledPackag
         provider: &Provider,
     ) -> Result<Option<Response>, ResolveError> {
         match request {
+            Request::DirectVariant(dist) => {
+                let variant = provider.select_wheel_variant(&dist).await.map_err(Arc::new);
+                Ok(Some(Response::DirectVariant { dist, variant }))
+            }
             Request::VariantProperties(parsed) => {
                 let properties = provider
                     .supported_variant_properties(&parsed.content)
@@ -3628,6 +3645,8 @@ pub(crate) enum Request {
     VariantsJson(RegistryVariantsJson),
     /// A request to discover target-specific properties for verified metadata.
     VariantProperties(Arc<ParsedVariantsJson>),
+    /// A request to select the supported properties of a direct wheel.
+    DirectVariant(BuiltDist),
     /// A request to pre-fetch the metadata for a package and the best-guess distribution.
     Prefetch(PackageName, Range<Version>, PythonRequirement),
 }
@@ -3687,6 +3706,7 @@ impl Display for Request {
             Self::VariantProperties(parsed) => {
                 write!(f, "Variant properties `{}`", parsed.artifact.filename)
             }
+            Self::DirectVariant(dist) => write!(f, "Direct wheel variant `{dist}`"),
             Self::Prefetch(package_name, range, _) => {
                 write!(f, "Prefetch {package_name} {range}")
             }
@@ -3718,6 +3738,11 @@ enum Response {
     VariantProperties {
         parsed: Arc<ParsedVariantsJson>,
         properties: SupportedVariantProperties,
+    },
+    /// The selected properties for a direct wheel.
+    DirectVariant {
+        dist: BuiltDist,
+        variant: Result<Option<SelectedVariant>, Arc<uv_distribution::Error>>,
     },
 }
 

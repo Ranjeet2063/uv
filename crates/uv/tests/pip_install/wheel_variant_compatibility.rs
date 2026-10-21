@@ -70,7 +70,6 @@ fn install_local_variant_wheel() -> Result<()> {
     exit_code: 0 (success)
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + ok==1.0.0 (from file://[TEMP_DIR]/ok-1.0.0-py3-none-any-gpu.whl)
     ");
@@ -81,10 +80,9 @@ fn install_local_variant_wheel() -> Result<()> {
         .arg("--preview-features")
         .arg("wheel-variants")
         .arg(wheel_path.path()), @"
-    exit_code: 2 (failure)
+    exit_code: 1 (failure)
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    error: Failed to determine installation plan
+    error: Failed to read `ok @ file://[TEMP_DIR]/ok-1.0.0-py3-none-any-gpu.whl`
       cause: Wheel variant `gpu` requires unsupported properties: `nvidia :: cuda_version_lower_bound :: 12` and `nvidia :: sm_arch :: 89_real`
     ");
 
@@ -95,10 +93,9 @@ fn install_local_variant_wheel() -> Result<()> {
         .arg("--preview-features")
         .arg("wheel-variants")
         .arg(wheel_path.path()), @"
-    exit_code: 2 (failure)
+    exit_code: 1 (failure)
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    error: Failed to determine installation plan
+    error: Failed to read `ok @ file://[TEMP_DIR]/ok-1.0.0-py3-none-any-gpu.whl`
       cause: Wheel variant `gpu` requires unsupported properties: `nvidia :: cuda_version_lower_bound :: 12` and `nvidia :: sm_arch :: 89_real`
     ");
     Ok(())
@@ -196,7 +193,6 @@ fn install_direct_url_variant_wheel() -> Result<()> {
     exit_code: 0 (success)
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + ok==1.0.0 (from http://[LOCALHOST]/ok-1.0.0-py3-none-any-gpu.whl)
     ");
@@ -208,10 +204,9 @@ fn install_direct_url_variant_wheel() -> Result<()> {
         .arg("--preview-features")
         .arg("wheel-variants")
         .arg(&url), @"
-    exit_code: 2 (failure)
+    exit_code: 1 (failure)
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    error: Failed to determine installation plan
+    error: Failed to download `ok @ http://[LOCALHOST]/ok-1.0.0-py3-none-any-gpu.whl`
       cause: Wheel variant `gpu` requires unsupported properties: `nvidia :: cuda_version_lower_bound :: 12` and `nvidia :: sm_arch :: 89_real`
     ");
     Ok(())
@@ -273,7 +268,6 @@ fn install_git_path_variant_wheel() -> Result<()> {
     exit_code: 0 (success)
     ----- stderr -----
     Resolved 1 package in [TIME]
-    Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
      + ok==1.0.0 (from git+file://[TEMP_DIR]/repository/@[COMMIT]#path=ok-1.0.0-py3-none-any-gpu.whl)
     ");
@@ -285,10 +279,9 @@ fn install_git_path_variant_wheel() -> Result<()> {
         .arg("--preview-features")
         .arg("wheel-variants")
         .arg(&requirement), @"
-    exit_code: 2 (failure)
+    exit_code: 1 (failure)
     ----- stderr -----
-    Resolved 1 package in [TIME]
-    error: Failed to determine installation plan
+    error: Failed to download `ok @ git+file://[TEMP_DIR]/repository/@[COMMIT]#path=ok-1.0.0-py3-none-any-gpu.whl`
       cause: Wheel variant `gpu` requires unsupported properties: `nvidia :: cuda_version_lower_bound :: 12` and `nvidia :: sm_arch :: 89_real`
     ");
     Ok(())
