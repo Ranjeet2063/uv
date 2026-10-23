@@ -7569,10 +7569,12 @@ dependencies = [
  "uv-pep508",
  "uv-platform",
  "uv-platform-tags",
+ "uv-preview",
  "uv-pypi-types",
  "uv-python-types",
  "uv-static",
  "uv-trampoline-builder",
+ "uv-warnings",
  "which",
  "windows",
 ]
