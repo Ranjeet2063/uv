@@ -178,7 +178,10 @@ impl Level {
                 }
                 Some(detected)
             }
-            CpuInfo::Unavailable { .. } => None,
+            CpuInfo::AppleSilicon { .. }
+            | CpuInfo::LinuxAarch64 { .. }
+            | CpuInfo::WindowsArm64 { .. }
+            | CpuInfo::Unavailable { .. } => None,
         }
     }
 }

@@ -1143,7 +1143,7 @@ struct InterpreterInfo {
     pointer_size: PointerSize,
     gil_disabled: bool,
     debug_enabled: bool,
-    /// Raw processor capabilities, if the interpreter runs on x86-64.
+    /// Raw processor capabilities reported by the interpreter.
     cpu_info: Option<CpuInfo>,
 }
 
