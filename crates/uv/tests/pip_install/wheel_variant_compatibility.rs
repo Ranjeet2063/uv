@@ -161,28 +161,71 @@ fn select_variant_by_static_provider_order() -> Result<()> {
     Ok(())
 }
 
-/// ARM64 interpreters built without libffi can still install ordinary wheels.
-#[cfg(target_arch = "aarch64")]
+/// ARM64 interpreters built without libffi can install the baseline AArch64 variant.
+#[cfg(all(
+    target_arch = "aarch64",
+    any(target_os = "linux", target_os = "macos", windows)
+))]
 #[test]
 fn aarch64_without_ctypes() -> Result<()> {
     let context = uv_test::test_context!("3.12");
     fs_err::write(
-        context.site_packages().join("missing_ctypes.pth"),
-        "import sys; sys.modules['_ctypes'] = None\n",
+        context.site_packages().join("sitecustomize.py"),
+        indoc::indoc! {r"
+            import sys
+
+            sys.modules['_ctypes'] = None
+        "},
     )?;
+    let links = context.temp_dir.child("links");
+    links.create_dir_all()?;
+    let tag = cfg_select! {
+        target_os = "linux" => "py3-none-linux_aarch64",
+        target_os = "macos" => "py3-none-macosx_11_0_arm64",
+        windows => "py3-none-win_arm64",
+    };
+    let mut metadata = json!({
+        "$schema": PEP_850_SCHEMA,
+        "default-priorities": { "namespace": ["aarch64"] },
+        "providers": { "aarch64": { "requires": ["aarch64-variant-provider==0.2.0"] } },
+    });
+    let mut variants = Map::new();
+    for (label, version) in [("arm8", "8a"), ("arm86", "8.6a")] {
+        let properties = json!({ "aarch64": { "version": [version] } });
+        metadata["variants"] = json!({ label: &properties });
+        variants.insert(label.to_owned(), properties);
+        let (_, wheel) = WheelBuilder::new(&"ok".parse()?, &"1.0.0".parse()?)
+            .tag(tag)
+            .files(&[
+                ("ok/variant.txt", version),
+                ("ok-1.0.0.dist-info/variant.json", &metadata.to_string()),
+            ])
+            .build();
+        links
+            .child(format!("ok-1.0.0-{tag}-{label}.whl"))
+            .write_binary(&wheel)?;
+    }
+    metadata["variants"] = variants.into();
+    links
+        .child("ok-1.0.0-variants.json")
+        .write_str(&metadata.to_string())?;
 
     uv_snapshot!(context.filters(), context.pip_install()
         .arg("--no-cache")
+        .arg("--no-index")
+        .arg("--find-links")
+        .arg(links.path())
         .arg("--preview-features")
         .arg("wheel-variants")
-        .arg(context.workspace_root.join("test/links/ok-1.0.0-py3-none-any.whl")), @"
+        .arg("ok==1.0.0"), @"
     exit_code: 0 (success)
     ----- stderr -----
     Resolved 1 package in [TIME]
     Prepared 1 package in [TIME]
     Installed 1 package in [TIME]
-     + ok==1.0.0 (from file://[WORKSPACE]/test/links/ok-1.0.0-py3-none-any.whl)
+     + ok==1.0.0
     ");
+    assert_snapshot!(context.read(context.site_packages().join("ok/variant.txt")), @"8a");
     Ok(())
 }
 
