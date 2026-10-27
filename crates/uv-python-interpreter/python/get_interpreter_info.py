@@ -866,11 +866,14 @@ def main() -> None:
         try:
             cpu_info = _get_cpu_info(arm64=arm64)
         except Exception as error:  # noqa: BLE001
-            # Forward all probe failures so Rust can apply the preview policy.
-            cpu_info = {
-                "kind": "unavailable",
-                "error": f"{type(error).__name__}: {error}",
-            }
+            cpu_info = {"kind": "unavailable"}
+            # AArch64 interpreters built without ctypes can use the Armv8-A baseline.
+            if not (
+                arm64
+                and isinstance(error, ModuleNotFoundError)
+                and error.name in {"ctypes", "_ctypes"}
+            ):
+                cpu_info["error"] = f"{type(error).__name__}: {error}"
 
     manylinux_compatible = False
 
