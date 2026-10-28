@@ -22,7 +22,9 @@ impl<'a> RegistryWheelRequest<'a> {
     ) -> Result<Self, Error> {
         let url = wheel.file.url.to_url().map_err(ErrorKind::InvalidUrl)?;
         let effective_index = &wheel.index;
-        let cache_control = indexes.artifact_cache_control_for(effective_index);
+        let cache_control = indexes
+            .request_policy(effective_index)
+            .artifact_cache_control();
         Ok(Self {
             url,
             effective_index,
